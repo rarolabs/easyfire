@@ -1,0 +1,10 @@
+package <%=@group%>.<%=@artifact%>.base;
+
+import java.util.List;
+
+public interface ModelEF {
+    void setKey(String key);
+    String getKey();
+    String[] getParentKeys();
+    String getPath();
+}

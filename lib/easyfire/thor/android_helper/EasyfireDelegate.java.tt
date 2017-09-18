@@ -1,0 +1,10 @@
+package <%=@group%>.<%=@artifact%>.base;
+
+import com.google.firebase.database.DatabaseError;
+
+public interface EasyfireDelegate<T> {
+
+    void changed(T t);
+
+    void error(Object object);
+}

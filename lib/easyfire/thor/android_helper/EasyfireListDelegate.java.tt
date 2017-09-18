@@ -1,0 +1,11 @@
+package <%=@group%>.<%=@artifact%>.base;
+
+public interface EasyfireListDelegate<T extends ModelEF> {
+
+    void added(T t);
+    void changed(T t);
+    void removed(T t);
+    void moved(T t);
+    void onError(Object o);
+    void done();
+}

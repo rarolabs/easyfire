@@ -1,0 +1,17 @@
+lazy val root = (project in file(".")).
+  settings(
+    organization := "<%=@group%>",
+    name := "<%=@artifact%>",
+    version := "<%=@version%>",
+    scalaVersion := "2.11.4",
+    scalacOptions ++= Seq("-feature"),
+    javacOptions in compile ++= Seq("-Xlint:deprecation"),
+    publishArtifact in (Compile, packageDoc) := false,
+    resolvers += Resolver.mavenLocal,
+    libraryDependencies ++= Seq(
+      "com.google.firebase" % "firebase-core" % "11.2.2"
+      "com.google.firebase" % "firebase-database" % "11.2.2"
+      "junit" % "junit" % "4.12" % "test",
+      "com.novocode" % "junit-interface" % "0.10" % "test"
+    )
+  )

@@ -1,0 +1,370 @@
+package <%=@group%>.<%=@artifact%>.base;
+
+import android.support.annotation.NonNull;
+
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.database.ChildEventListener;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.ValueEventListener;
+
+public abstract class ServiceEF<T extends ModelEF> {
+
+    private ChildEventListener childEventListener;
+    private DatabaseReference childListenerRef;
+    private ValueEventListener valueEventListener;
+    private DatabaseReference valueListenerRef;
+    private DatabaseReference trackingRef;
+    private ValueEventListener trackingValueListener;
+    private EasyfireListDelegate paginateDelegate;
+    private ChildEventListener firstPageChildEventListener;
+    private String oldestKeyYouveSeen;
+    private DatabaseReference childPaginateListenerRef;
+
+    public abstract DatabaseReference getRef();
+    protected abstract Class<T> getRuntimeClass();
+
+    public void retrieve(final String key, final EasyfireDelegate<T> delegate, String... parentKeys){
+        DatabaseReference localRef = getRef();
+
+        for(String parentKey : parentKeys){
+            localRef = localRef.child(parentKey);
+        }
+
+        localRef.child(key);
+        findByPath(delegate, localRef);
+    }
+
+    public void retrieve(final String path, final EasyfireDelegate<T> delegate){
+        DatabaseReference localRef = getRef();
+
+        localRef.child(path);
+        findByPath(delegate, localRef);
+    }
+
+
+    private void findByPath(final EasyfireDelegate<T> delegate, DatabaseReference localRef) {
+        localRef.addListenerForSingleValueEvent(new ValueEventListener() {
+
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (dataSnapshot.exists()) {
+
+                    T t = dataSnapshot.getValue(getRuntimeClass());
+                    t.setKey(dataSnapshot.getKey());
+                    delegate.changed(t);
+                } else {
+                    delegate.changed(null);
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                delegate.error(databaseError);
+            }
+        });
+    }
+
+
+    public void store(final T t,
+                      final EasyfireDelegate<T> delegate) {
+
+        DatabaseReference localRef = getRef();
+        for(Object parentKey: t.getParentKeys()){
+            localRef = localRef.child(parentKey.toString());
+        }
+
+        if (t.getKey() == null) {
+            localRef = localRef.push();
+        } else {
+            localRef = localRef.child(t.getKey());
+        }
+        t.setKey(localRef.getKey());
+
+        Task<Void> task = localRef.setValue(t);
+        task.addOnCompleteListener(new OnCompleteListener<Void>() {
+            @Override
+            public void onComplete(@NonNull Task<Void> task) {
+                delegate.changed(t);
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e) {
+                delegate.error(e);
+            }
+        });
+    }
+
+    public void delete(final T t, final EasyfireDelegate<Boolean> delegate) {
+        Task<Void> task;
+
+        DatabaseReference localRef =getRef();
+
+        for(Object parentKey: t.getParentKeys()){
+            localRef = localRef.child(parentKey.toString());
+        }
+
+        task = localRef.child(t.getKey()).removeValue();
+
+        task.addOnCompleteListener(new OnCompleteListener<Void>() {
+            @Override
+            public void onComplete(@NonNull Task<Void> task) {
+                delegate.changed(true);
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e) {
+                delegate.error(e);
+            }
+        });
+    }
+
+    public void observeValue(final EasyfireListDelegate delegate,String... parentKeys) {
+
+        valueEventListener = new ValueEventListener(){
+
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if(dataSnapshot.exists()){
+                    T t = dataSnapshot.getValue(getRuntimeClass());
+                    t.setKey(dataSnapshot.getKey());
+                    delegate.added(t);
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                delegate.onError(databaseError);
+            }
+        };
+
+        this.valueListenerRef = getRef();
+        for(String parentKey: parentKeys){
+            this.valueListenerRef = valueListenerRef.child(parentKey);
+        }
+        this.valueListenerRef.addValueEventListener(valueEventListener);
+
+
+    }
+
+    public void removeValueObserve() {
+
+        if(valueEventListener != null && this.valueListenerRef != null){
+            this.valueListenerRef.removeEventListener(valueEventListener);
+        }
+    }
+
+
+    public void observeChild(final EasyfireListDelegate<T> delegate,String... parentKeys) {
+
+        childEventListener = new ChildEventListener() {
+
+            @Override
+            public void onChildAdded(DataSnapshot dataSnapshot, String previousChildName) {
+
+                if (dataSnapshot.exists()) {
+                    T t = dataSnapshot.getValue(getRuntimeClass());
+                    t.setKey(dataSnapshot.getKey());
+                    delegate.added(t);
+                }
+
+            }
+
+            @Override
+            public void onChildChanged(DataSnapshot dataSnapshot, String previousChildName) {
+                if (dataSnapshot.exists()) {
+                    T t = dataSnapshot.getValue(getRuntimeClass());
+                    if (t != null) {
+                        t.setKey(dataSnapshot.getKey());
+
+                        delegate.changed(t);
+                    }
+                }
+            }
+
+            @Override
+            public void onChildRemoved(DataSnapshot dataSnapshot) {
+                delegate.removed(createInstanceWithKey(dataSnapshot.getKey()));
+            }
+
+            @Override
+            public void onChildMoved(DataSnapshot dataSnapshot, String previousChildName) {
+                if (dataSnapshot.exists()) {
+                    T t = dataSnapshot.getValue(getRuntimeClass());
+                    if (t != null) {
+                        t.setKey(dataSnapshot.getKey());
+
+                        delegate.moved(t);
+                    }
+                }
+            }
+
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                delegate.onError(databaseError);
+            }
+        };
+
+        this.childListenerRef = getRef();
+
+        for(String parentKey: parentKeys){
+            this.childListenerRef = childListenerRef.child(parentKey);
+        }
+        this.childListenerRef.addChildEventListener(childEventListener);
+
+    }
+
+    public void removeChildObserve() {
+
+        if(childEventListener != null && this.childListenerRef != null){
+            this.childListenerRef.removeEventListener(childEventListener);
+        }
+    }
+    public abstract T createInstanceWithKey(String key);
+
+
+
+    public void startTracking(final String path, final EasyfireListDelegate delegate){
+        this.trackingRef = getRef();
+        this.trackingRef = this.trackingRef.child(path);
+        trackingValueListener = new ValueEventListener(){
+
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if(dataSnapshot.exists()){
+                    T t = dataSnapshot.getValue(getRuntimeClass());
+                    t.setKey(dataSnapshot.getKey());
+                    delegate.changed(t);
+                }else{
+                    T t = dataSnapshot.getValue(getRuntimeClass());
+                    t.setKey(dataSnapshot.getKey());
+                    delegate.removed(createInstanceWithKey(dataSnapshot.getKey()));
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                delegate.onError(databaseError);
+            }
+        };
+
+        this.trackingRef.addValueEventListener(trackingValueListener);
+
+    }
+
+    public void stopTracking(){
+        if(this.trackingRef != null && this.trackingValueListener != null) {
+            this.trackingRef.removeEventListener(trackingValueListener);
+        }
+    }
+
+
+    public void startPagination(final EasyfireListDelegate delegate,int pageSize, String... parentKeys) {
+        this.paginateDelegate = delegate;
+        this.firstPageChildEventListener = createPaginateChildEventListener();
+        oldestKeyYouveSeen = null;
+
+        this.childPaginateListenerRef = getRef();
+
+        for(String parentKey: parentKeys){
+            this.childPaginateListenerRef = childPaginateListenerRef.child(parentKey);
+        }
+
+        this.childPaginateListenerRef.limitToLast(pageSize).addChildEventListener(firstPageChildEventListener);
+    }
+
+    public void nextPage(int pageSize) {
+        String start = oldestKeyYouveSeen;
+        oldestKeyYouveSeen = null;
+
+        this.childPaginateListenerRef.orderByKey().endAt(start).limitToLast(pageSize).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if(dataSnapshot.getChildrenCount() > 0) {
+                    for (DataSnapshot child : dataSnapshot.getChildren()) {
+                        if (oldestKeyYouveSeen == null) {
+                            oldestKeyYouveSeen = child.getKey();
+                        }
+                        T t = child.getValue(getRuntimeClass());
+                        t.setKey(child.getKey());
+                        paginateDelegate.added(t);
+                    }
+                }else{
+                    paginateDelegate.done();
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                paginateDelegate.onError(databaseError);
+            }
+        });
+
+    }
+
+
+    private ChildEventListener createPaginateChildEventListener() {
+        return new ChildEventListener() {
+            @Override
+            public void onChildAdded(DataSnapshot dataSnapshot, String previousChildName) {
+
+                if (dataSnapshot.exists()) {
+                    if (oldestKeyYouveSeen == null) {
+                        oldestKeyYouveSeen = dataSnapshot.getKey();
+                    }
+                    T t = dataSnapshot.getValue(getRuntimeClass());
+                    t.setKey(dataSnapshot.getKey());
+                    paginateDelegate.added(t);
+                }
+
+            }
+
+            @Override
+            public void onChildChanged(DataSnapshot dataSnapshot, String previousChildName) {
+                if (dataSnapshot.exists()) {
+
+                    if (oldestKeyYouveSeen == null) {
+                        oldestKeyYouveSeen = dataSnapshot.getKey();
+                    }
+                    T t = dataSnapshot.getValue(getRuntimeClass());
+                    t.setKey(dataSnapshot.getKey());
+                    paginateDelegate.added(t);
+                }
+            }
+
+            @Override
+            public void onChildRemoved(DataSnapshot dataSnapshot) {
+                T t = createInstanceWithKey(dataSnapshot.getKey());
+                paginateDelegate.removed(t);
+            }
+
+            @Override
+            public void onChildMoved(DataSnapshot dataSnapshot, String previousChildName) {
+                if (dataSnapshot.exists()) {
+
+                    if (oldestKeyYouveSeen == null) {
+                        oldestKeyYouveSeen = dataSnapshot.getKey();
+                    }
+                    T t = dataSnapshot.getValue(getRuntimeClass());
+                    t.setKey(dataSnapshot.getKey());
+                    paginateDelegate.moved(t);
+                }
+            }
+
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                paginateDelegate.onError(databaseError);
+            }
+        };
+
+    }
+
+
+
+
+}
