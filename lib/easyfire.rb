@@ -9,6 +9,7 @@ require 'easyfire/renders/model'
 require 'easyfire/renders/service'
 require 'erb'
 require "easyfire/thor/android"
+require "easyfire/thor/swift"
 require "easyfire/cli"
 
 class String

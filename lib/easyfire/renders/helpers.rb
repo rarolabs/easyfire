@@ -29,19 +29,19 @@ module Easyfire
       }
     
       def type_to_java_value(data_type)
-        @@java_data_types[data_type] || data_type.to_s
+        @@java_data_types[data_type] || data_type.to_s 
       end
+      
       def type_to_swift_value(data_type)
-        @@swift_data_types[data_type]
+        @@swift_data_types[data_type] || data_type.to_s + "?"
       end
-    
     
       def java_default_value(data_type)
         @@java_defaults[data_type] || "null"
       end
     
       def swift_default_value(data_type)
-        @@swift_defaults[data_type]
+        @@swift_defaults[data_type] || "nil"
       end
       
       def extract_spec(spec)
