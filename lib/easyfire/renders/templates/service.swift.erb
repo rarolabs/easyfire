@@ -80,8 +80,7 @@ class <%= @name %>ServiceEF{
     func store(object: <%= @class_name_ef %>, complete: @escaping (Error?,<%= @class_name_ef %>?) -> ()){
         
         let model = object
-        let path : String? = model.parentKeys?.joined(separator: "/")
-        var localRef = getRef(path: path ?? "")
+        var localRef = getRef(path: model.parentKeys.joined(separator: "/"))
 
         if let key = object.key {
             localRef = localRef.child(key)
@@ -103,8 +102,7 @@ class <%= @name %>ServiceEF{
     
     
     func delete(object: <%= @class_name_ef %>, complete: @escaping (Error?,Bool?) -> ()){
-        let path = object.parentKeys?.joined(separator: "/")
-        let localRef = getRef(path: path )
+        let localRef = getRef(path: object.parentKeys.joined(separator: "/") )
         localRef.child(object.key!).removeValue { (error, ref) in
             complete(error, error == nil)
         }
@@ -117,26 +115,26 @@ class <%= @name %>ServiceEF{
         }
     }
     
-    
-    func startListValueChanges(parentKeys: [String],delegate: @escaping (Error?,[<%= @class_name_ef %>]?) -> ()){
+
+    func startListValueChanges(parentKeys: [String],delegate: @escaping (Error?,<%= @class_name_ef %>?) -> ()){
         
         self.stopListValueChanges()
         valueListenerRef = getRef(path: parentKeys.joined(separator: "/"))
         
         valueEventListener = valueListenerRef?.observe(.value, with: { (snapshot) in
             if snapshot.exists() {
-                var values : [<%= @class_name_ef %>]? = []
                 for child in snapshot.children {
                     let model : <%= @class_name_ef %>? = self.createModelFrom(snapshot: child as! DataSnapshot)
-                    values?.append(model!)
+                    delegate(nil,model)
                 }
-                delegate(nil,values)
+                
             }
         }){ (error) in
             print(error.localizedDescription)
             delegate(error,nil)
         }
     }
+
     
     func stopListValueChanges(){
         
@@ -196,6 +194,27 @@ class <%= @name %>ServiceEF{
         getRef().child(path).removeAllObservers()
     }
     
+    func getChildCollection(parentKeys: [String], complete: @escaping (Error?,[<%= @class_name_ef %>]?) -> ()) {
+      
+       let localRef = getRef(path: parentKeys.joined(separator: "/"))
+       localRef.observe(.value, with: { (snapshot) in
+           if snapshot.exists() {
+               var values : [<%= @class_name_ef %>] = []
+               for child in snapshot.children {
+                   let model : <%= @class_name_ef %>? = self.createModelFrom(snapshot: child as! DataSnapshot)
+                   values.append(model!)
+               }
+               complete(nil,values)
+           }
+
+       }) { (error) in
+           print(error.localizedDescription)
+           complete(error,nil)
+
+       }
+    }
+       
+       
     func startPagination(pageSize: Int, parentKeys: [String], delegate: @escaping (Error?,<%= @class_name_ef %>?) -> ()){
 
         self.oldestKeyYouveSeen = nil

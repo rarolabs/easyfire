@@ -4,28 +4,39 @@ module Easyfire
       
       attr_accessor :base_package, :version
       
+      @@natives = {
+        String: true,
+        Long: true,
+        Boolean: true,
+        Double: true
+      }  
+      
       @@java_data_types = {
         String: "String",
         Long: "Long",
-        Boolean: "Boolean"
+        Boolean: "Boolean",
+        Double: "Double"
       }  
     
       @@swift_data_types = {
         String: "String?",
         Long: "CLong?",
-        Boolean: "Bool?"
+        Boolean: "Bool?",
+        Double: "Double"
       }  
     
       @@java_defaults = {
         String: "\"\"",
         Long: "0L",
-        Boolean: "false"
+        Boolean: "false",
+        Double: 0.0
       }
     
       @@swift_defaults = {
         String: "\"\"",
         Long: "0",
-        Boolean: "false"
+        Boolean: "false",
+        Double: 0.0
       }
     
       def type_to_java_value(data_type)
@@ -44,6 +55,11 @@ module Easyfire
         @@swift_defaults[data_type] || "nil"
       end
       
+      def native_value(data_type)
+         @@natives[data_type]
+      end
+    
+ 
       def extract_spec(spec)
         @spec = spec
         @name = spec.model_name.to_s
@@ -54,7 +70,9 @@ module Easyfire
         @declaration = "#{@class_name_ef} #{@object_name_ef}"
         @description = spec.description
         @attributes = spec.attributes
-        @belongs_to = spec.associations
+        @native_attributes = spec.attributes.select{|k,v| native_value(v[:type])}
+        @belongs_to = spec.associations.select{|k,v| v[:type] == :belongs_to}
+        @has_many = spec.associations.select{|k,v| v[:type] == :has_many}
         @parents = spec.parents
       end
       

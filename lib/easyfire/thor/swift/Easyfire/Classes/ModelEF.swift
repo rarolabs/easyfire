@@ -12,7 +12,7 @@ import FirebaseDatabase
 protocol ModelEF {
     
     var key : String? {get set}
-    var parentKeys : [String]? {get set}
+    var parentKeys : [String] {get set}
     var path : String? {get}
     
     

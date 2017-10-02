@@ -23,14 +23,17 @@ class Swift < Thor
     service = Easyfire::Renders::Service.new
     service.base_package = @package
     service.version = @version
-    Dir["#{options[:source]}/*"].each do |file|
+    
+    Dir["#{options[:source]}/*.rb"].each do |file|
       className = file.split(/\//).last.gsub(/\.rb/,'')
       content = IO.read(file)
       current_model = eval(content)
       create_file "#{@models_destination}/#{className.camelcase}EF.swift", model.to_swift(current_model)
       create_file "#{@services_destination}/#{className.camelcase}ServiceEF.swift", service.to_swift(current_model)
     end
+    
     puts "\n"
+    
   end
   
   def create_output_structure

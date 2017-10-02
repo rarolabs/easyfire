@@ -1,4 +1,5 @@
 module Easyfire
+  
   class ModelSpec
     attr_accessor :model_name, :description, :model_type, :parents, :attributes, :associations
     def initialize()
@@ -10,6 +11,7 @@ module Easyfire
       @parents = []
     end
   end
+  
   class EasyfireModel
     
     attr_accessor :spec
@@ -45,6 +47,59 @@ module Easyfire
     end
     
     
+    def has_many(has_many_name,className, &block)
+      
+      @has_many_name = has_many_name
+
+      new_association = {
+        type: :has_many,
+        description: "",
+        example: "",
+        navigable: false,
+        load: :lazy,
+        className: className
+      }
+
+      unless self.respond_to? :has_many_navigable
+        
+        def has_many_navigable(value)
+          @spec.associations[@has_many_name][:navigable] = value
+        end
+      
+        def has_many_load(value)
+          @spec.associations[@has_many_name][:load] = value
+        end
+
+        def has_many_example(text)
+          @spec.associations[@has_many_name][:example] = text
+        end
+
+        def has_many_description(text)
+          @spec.associations[@has_many_name][:description] = text
+        end
+        
+      end
+
+      @spec.associations[@has_many_name] = new_association
+      block.call
+      
+      
+      # proc = Proc.new do
+      #     attr_description ""
+      #     attr_data_type :String
+      # end
+      # attribute("#{bt_name.to_s.uncapitalize}EFPath".to_sym,&proc)
+      #
+      # proc = Proc.new do
+      #     attr_description ""
+      #     attr_data_type "#{bt_name}EF"
+      #     attr_options [:transient]
+      #     attr_association bt_name
+      # end
+      #
+      # attribute("#{bt_name.to_s.uncapitalize}EF".to_sym,&proc)
+    end
+  
     
     def belongs_to(bt_name, &block)
       
@@ -82,11 +137,11 @@ module Easyfire
       block.call
       
       
-      proc = Proc.new do
-          attr_description ""
-          attr_data_type :String
-      end
-      attribute("#{bt_name.to_s.uncapitalize}EFPath".to_sym,&proc)
+      # proc = Proc.new do
+      #     attr_description ""
+      #     attr_data_type :String
+      # end
+      # attribute("#{bt_name.to_s.uncapitalize}EFPath".to_sym,&proc)
 
       proc = Proc.new do
           attr_description ""

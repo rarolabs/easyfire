@@ -10,44 +10,71 @@ import FirebaseDatabase
 
 class <%= @class_name_ef %> : ModelEF,  Equatable {
     
-    var key: String?
+  var key: String?
+  var parentKeys : [String]  = []
 
-    var parentKeys : [String]?  = nil
-    var path : String?  = nil
+   var path : String? {
+      get {
+        let prefix = parentKeys.joined(separator: "/")
+        if prefix == "" {
+            return "/<%=@collection_name%>/" + key!
+        }
+        return "/<%=@collection_name%>/" + prefix + "/"  + key!
+      }
+    }
     
-    
-    <%@attributes.each do |key,value|%>
+    <%@native_attributes.each do |key,value|%>
     //<%=value[:description]%>
     var <%=key%>: <%=type_to_swift_value(value[:type])%>
     <%end%>
     
-    required init( <%=@attributes.to_a.map{|e| "#{e[0].to_s}: #{type_to_swift_value(e[1][:type])}"}.join(",\n          ")%> ) {
+    <% if @parents.size > 0 %>
+    required init( <%=@native_attributes.to_a.map{|e| "#{e[0].to_s}: #{type_to_swift_value(e[1][:type])}"}.join(",\n          ")%>, <%=@parents.to_a.map{|e|"#{e.to_s.uncapitalize}: String"}.join(',')%> ) {
       
-          <%=@attributes.to_a.map{|e| "self.#{e[0].to_s} = #{e[0].to_s}"}.join("\n          ")%>
+          <%=@native_attributes.to_a.map{|e| "self.#{e[0].to_s} = #{e[0].to_s}"}.join("\n          ")%>
+          <%@parents.to_a.each_with_index do |e,i| %>
+          parentKeys.append(<%="#{e.to_s.uncapitalize}"%>)
+          <%end%>
+          
+    }
+
+    <% else %>
+    required init( <%=@native_attributes.to_a.map{|e| "#{e[0].to_s}: #{type_to_swift_value(e[1][:type])}"}.join(",\n          ")%> ) {
+      
+          <%=@native_attributes.to_a.map{|e| "self.#{e[0].to_s} = #{e[0].to_s}"}.join("\n          ")%>
     
     }
+    <% end %>
     
     required init( snapshot: DataSnapshot ) {
       
       key = snapshot.key
       let snapshotValue = snapshot.value as! [String: AnyObject]
       
-      <%=@attributes.to_a.map{|e| "self.#{e[0].to_s} = snapshotValue[\"#{e[0].to_s}\"] as? #{type_to_swift_value(e[1][:type])} ?? #{swift_default_value(e[1][:type])}" }.join("\n      ")%>
+      <%=@native_attributes.to_a.map{|e| "self.#{e[0].to_s} = snapshotValue[\"#{e[0].to_s}\"] as? #{type_to_swift_value(e[1][:type])} ?? #{swift_default_value(e[1][:type])}" }.join("\n      ")%>
     
     }
 
     required init( key: String ) {
       
       self.key = key
-      <%=@attributes.to_a.map{|e| "self.#{e[0].to_s} = #{swift_default_value(e[1][:type])}" }.join("\n      ")%>
+      <%=@native_attributes.to_a.map{|e| "self.#{e[0].to_s} = #{swift_default_value(e[1][:type])}" }.join("\n      ")%>
     }
       
     func toAnyObject() -> Any {
       let object : [String : Any] =  [
-           <%=@attributes.to_a.map{|e| "\"#{e[0].to_s}\" : #{e[0].to_s} ?? #{swift_default_value(e[1][:type])}" }.join(",\n           ")%>            
+           <%=@native_attributes.to_a.map{|e| "\"#{e[0].to_s}\" : #{e[0].to_s} ?? #{swift_default_value(e[1][:type])}" }.join(",\n           ")%>            
         ]
         return object
     }
+    
+    <% @has_many.each do |key,value| %>
+    func <%=key%>(complete: @escaping (Error?,  [<%=value[:className]%>EF]?) -> ()){
+          let service = <%=value[:className]%>ServiceEF()
+          service.getChildCollection(parentKeys: self.parentKeys,complete: complete)
+        
+    }
+    <% end %>
     
     static func ==(lhs: <%= @class_name_ef %>, rhs: <%= @class_name_ef %>) -> Bool {
         return lhs.key == rhs.key
